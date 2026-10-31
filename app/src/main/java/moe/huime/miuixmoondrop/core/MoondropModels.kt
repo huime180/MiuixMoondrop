@@ -206,11 +206,17 @@ object MoondropModels {
         AncPathKind.AUDIO_CURATION,
     )
 
-    /** 布丁 PUDDING 五档：UI[关,降,透,抗,自适应] → dev [0,4,2,3,1]，走 ANC_V2 恒等读回。 */
+    /** 布丁 PUDDING 五档：UI[关,降,透,抗,自适应] → dev [0,1,2,3,4]，走 ANC_V2 恒等读回。
+     *
+     * 与官方 ANC V2 枚举一致（Qualcomm `AncV2Handler`：0 OFF / 1 ON / 2 TRANSPARENT /
+     * 3 ANTI_WIND / 4 ADAPTIVE / 5 LIVE）。MOONDROP Link 的 Flutter 侧
+     * `AncV2Handler.handleSetAncV2Mode` 只做 `0 <= mode < 6` 校验后原样透传给
+     * `AncV2Plugin.setCurrentMode`，PUDDING 没有私有枚举偏移。
+     */
     private fun ancPudding() = AncProfile(
         ANC_5,
-        intArrayOf(0, 4, 2, 3, 1),
-        intArrayOf(0, 4, 2, 3, 1),
+        intArrayOf(0, 1, 2, 3, 4),
+        intArrayOf(0, 1, 2, 3, 4),
         AncPathKind.ANC_V2,
     )
 

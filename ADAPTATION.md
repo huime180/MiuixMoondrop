@@ -73,7 +73,7 @@ data class MoondropModel(
 | id | ANC 路径 / 档位（SET / GET 映射） | 增益 `gainMap`（UI 低中高 → 设备码） | 指示灯 | 电量（证据） | verified |
 |---|---|---|---|---|---|
 | `edge` | AudioCuration / 3 档：SET `[1,2,4]`，GET `[0,1,2]` | `[0,1,2]` | — | **只回 type 0 单设备**（moondrop-link 真机 60%） | ✅ 实测 |
-| `pudding` | ANC V2 / 5 档：SET `[0,4,2,3,1]`，GET 同 | `[2,1,0]`（设备码 0=高，真机修正） | ✅ | **三路** 1=左 2=右 3=盒（PuddingPods 文档） | ✅ 实测 |
+| `pudding` | ANC V2 / 5 档：SET `[0,1,2,3,4]`，GET 同 | `[2,1,0]`（设备码 0=高，真机修正） | ✅ | **三路** 1=左 2=右 3=盒（PuddingPods 文档） | ✅ 实测 |
 | `golden_ages_2` | AudioCuration / 4 档：SET `[1,2,4,3]`，GET `[0,1,2,3]` | `[2,1,0]` | — | 仅左右耳，**无充电盒**（FxxkMoondrop 实测） | ✅ 实测 |
 | `space_travel_2` | AudioCuration / 4 档：SET `[1,2,4,3]`，GET `[0,1,2,3]` | `[2,1,0]` | — | 未实测 | ✅ 实测 |
 | `golden_ages` | AudioCuration / 4 档：同 GA2 | `[2,1,0]` | — | 未实测 | 推断 |
@@ -122,7 +122,7 @@ data class AncProfile(
 | `anc4Ga2()` | 关/降/透/抗 | `[1,2,4,3]` | `[0,1,2,3]` | AudioCuration | 梦回2、太空漫游2、梦回、太空漫游2 ULTRA |
 | `anc4Identity()` | 关/降/透/抗 | `[1,2,3,4]` | `null` | AudioCuration | 猫咖、猫饼、音乐胶囊、超声波、知更鸟、爱丽丝、火花、旅行者、方糖、太空漫游、fallback |
 | `anc3Ac()` | 关/降/透 | `[1,2,4]` | `[0,1,2]` | AudioCuration | EDGE、EDGE2 |
-| `ancPudding()` | 关/降/透/抗/自适应 | `[0,4,2,3,1]` | `[0,4,2,3,1]`（恒等读回） | ANC_V2 | PUDDING |
+| `ancPudding()` | 关/降/透/抗/自适应 | `[0,1,2,3,4]` | `[0,1,2,3,4]`（恒等读回） | ANC_V2 | PUDDING |
 | `ancV2Identity()` | 关/降/透/抗/自适应/LIVE | `[0..5]` | `[0..5]` | ANC_V2 | ⚠ **定义了但没有任何机型使用（死代码）** |
 
 > `anc4Identity` 的映射符合 AudioCuration 的**名义编码** `1=关 2=降噪 3=透传 4=抗风`，
@@ -134,7 +134,7 @@ data class AncProfile(
 |---|---|---|
 | 梦回2 / Golden Ages 2 | FxxkMoondrop 2026-08-24 官方 App 抓包 + 08-25 真机双向实测 | SET `[1,2,4,3]`；**GET 是 0-based `[0,1,2,3]`**，与 SET 枚举不同（`AncProfileLib.Profile("GOLDEN AGES 2", intArrayOf(1,2,4,3), intArrayOf(0,1,2,3))`） |
 | 太空漫游2 / Space Travel 2 | FxxkMoondrop 2026-09-01 真机双向实测 | AudioCuration，映射同 GA2：SET `[1,2,4,3]` / GET `[0,1,2,3]` |
-| PUDDING / MD-TWS-056 | PuddingPods 协议文档 + FxxkMoondrop 适配说明 | ANC V2 五档：TX `00 1D 40 04 <mode>`；`00`=关 `01`=自适应 `02`=通透 `03`=抗风 `04`=基础降噪；UI[关,降,透,抗,自适应] → `[0,4,2,3,1]` |
+| PUDDING / MD-TWS-056 | 官方 App 逆向（`AncV2Handler` 常量）+ 本项目真机五档双向实测 | ANC V2 五档：TX `00 1D 40 04 <mode>`；`00`=关 `01`=基础降噪 `02`=通透 `03`=抗风 `04`=自适应；UI[关,降,透,抗,自适应] → `[0,1,2,3,4]`（即标准 ANC V2 枚举，**无 PUDDING 专属偏移**） |
 | EDGE | moondrop-link-desktop 真机验证（听感确认） | 走 AudioCuration（**无 ANC_V2**）；SET payload 是**位掩码** `1`=关闭降噪 / `2`=ANC / `4`=通透；读回是 0-based 索引 `0..2` |
 
 ### 读写与回包处理（`MoondropLink`）
