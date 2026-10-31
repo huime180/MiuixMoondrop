@@ -81,6 +81,28 @@
 
 ## Unreleased
 
+### 修正：布丁 PUDDING 的降噪映射 `[0,4,2,3,1]` 是错的
+
+`ancPudding()` 原来用 `intArrayOf(0,4,2,3,1)`，导致 UI 上选「降噪（基础）」实际下发 `4`（自适应）、选「自适应」实际下发 `1`（基础降噪）——**这两档在收发两个方向上都颠倒了**；关 / 通透 / 抗风噪碰巧是对的，所以不容易被发现。
+
+根因是把 PuddingPods 早期文档里的错误枚举（`0/1/2/3/4 = 关/自适应/通透/抗风/基础降噪`）当成了 PUDDING 的专属偏移。实际上 PUDDING 用的就是标准 Qualcomm ANC V2 枚举：
+
+| 值 | 含义（官方 `AncV2Handler` 常量） |
+|---:|---|
+| 0 | `MODE_ANC_OFF` |
+| 1 | `MODE_ANC_ON`（基础降噪） |
+| 2 | `MODE_TRANSPARENT` |
+| 3 | `MODE_ANTI_WIND` |
+| 4 | `MODE_ADAPTIVE` |
+| 5 | `MODE_LIVE` |
+
+依据：MOONDROP Link 的 `AncV2Handler` 把 `MODE_ANC_OFF/ON/TRANSPARENT/ANTI_WIND/ADAPTIVE/LIVE` 硬编码为 `0..5`，`handleSetAncV2Mode` 只校验 `0 <= mode < 6` 后原样透传给 `AncV2Plugin.setCurrentMode`；HyperEars 独立逆向得到的 `NoiseMode` 也是 `OFF(0x00)/ANC(0x01)/TRANSPARENCY(0x02)`。
+
+* `MoondropModels.ancPudding()` 映射改为 `[0,1,2,3,4]`；
+* 删除 `Gaia.kt` 里那套与标准枚举矛盾、且全仓库无调用方的 `PUDDING_ANC_*` 常量；
+* `PROTOCOL.md` 删掉「PUDDING 使用不同枚举」的例外说明；
+* `ADAPTATION.md` 三处表格同步，并把 PUDDING 的证据来源从「转抄上游文档」改为「官方 App 逆向 + 真机五档双向实测」。
+
 ### 通知三档：原生通知栏 / 焦点显示 / 超级岛提示（`hook/MiBluetoothToastHook.kt`）
 
 用户反馈「设置-通知 始终是焦点显示通知」。根因是设置页那三个开关里，
@@ -136,7 +158,7 @@
   * **有上游实测依据（`verified = true`，4 款）**：
     * 羽翼 EDGE —— GAIA v3 over BLE；电量只回 `type 0`（单设备）；ANC 走 AudioCuration 三态位掩码
       `1/2/4`；`ONEBRINGTWO(0x14)` 可用（moondrop-link-desktop 真机验证）；
-    * 布丁 PUDDING（MD-TWS-056）—— GAIA v4 over RFCOMM/SPP；ANC V2 五档 `[0,4,2,3,1]`；
+    * 布丁 PUDDING（MD-TWS-056）—— GAIA v4 over RFCOMM/SPP；ANC V2 五档 `[0,1,2,3,4]`；
       三路电量（含充电盒）；增益恒等、指示灯（PuddingPods 协议文档 + FxxkMoondrop 实测）；
     * 梦回2 / Golden Ages 2 —— AudioCuration，SET `[1,2,4,3]` / GET `[0,1,2,3]`，增益 `[2,1,0]`，
       空间音频 + 头动追踪（FxxkMoondrop 2026-08-24/25 双向实测）；

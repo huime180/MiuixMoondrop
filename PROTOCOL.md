@@ -312,10 +312,11 @@ ANC V2 模式枚举（官方 `AncV2Handler` / moondrop-link `constants.py` 一�
 | 4 | ADAPTIVE（自适应） |
 | 5 | LIVE |
 
-⚠ 布丁 PUDDING 在同一 feature 上使用**不同的枚举**（PuddingPods 文档）：
-`0`=关、`1`=自适应降噪、`2`=通透、`3`=抗风噪、`4`=基础降噪。
-所以 `Gaia.kt` 额外定义了 `PUDDING_ANC_*` 常量，并在档案里用映射表 `[0,4,2,3,1]` 转换
-（**不能**直接把官方枚举当通用值）。
+布丁 PUDDING 在 ANC V2 上用的也是**这张表**，没有专属枚举偏移
+（PuddingPods 早期文档里的 `0/1/2/3/4 = 关/自适应/通透/抗风/基础降噪` 是错的，
+它把「基础降噪」摆在了 `4`、「自适应」摆在了 `1`，实际正好相反）。
+依据：MOONDROP Link 的 `AncV2Handler` 把 `MODE_ANC_OFF/ON/TRANSPARENT/ANTI_WIND/ADAPTIVE/LIVE`
+硬编码为 `0..5`，`handleSetAncV2Mode` 仅校验 `0 <= mode < 6` 后原样下发。
 
 ### BATTERY（13）
 

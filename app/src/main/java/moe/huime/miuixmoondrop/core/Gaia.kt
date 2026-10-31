@@ -339,12 +339,9 @@ object Gaia {
     const val ANC2_ADAPTIVE = 4
     const val ANC2_LIVE = 5
 
-    // 布丁 PUDDING（GAIA V4）专用 ANC V2 枚举：0=关 1=自适应 2=通透 3=抗风 4=基础降噪
-    const val PUDDING_ANC_OFF = 0
-    const val PUDDING_ANC_ADAPTIVE = 1
-    const val PUDDING_ANC_TRANSPARENT = 2
-    const val PUDDING_ANC_ANTI_WIND = 3
-    const val PUDDING_ANC_BASIC_NC = 4
+    // PUDDING 曾经在这里定义了一套与上面矛盾的 PUDDING_ANC_* 枚举
+    // （0=关 1=自适应 2=通透 3=抗风 4=基础降噪）。实测与官方 App 逆向都表明
+    // 该偏移并不存在——PUDDING 用的就是 ANC_V2 标准枚举，因此已删除。
 
     // ============================================================
     // ANC 路径
