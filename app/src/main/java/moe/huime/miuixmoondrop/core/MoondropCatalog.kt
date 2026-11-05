@@ -105,13 +105,35 @@ object MoondropCatalog {
         return out.values.toList()
     }
 
+    private val VERSION_RE = Regex("""(?<![A-Za-z])\d+(?:\.\d+){1,3}(?!\d)""")
+    private val DIRTY_RE = Regex("""\b(?:JP|EN|CN|KO|KR|JA|SPECIAL|INIT|TEST\d?)\b""", RegexOption.IGNORE_CASE)
+
+    /**
+     * 同一匹配键只留一条，择优规则：
+     *   1. 「干净」名字优先（不带版本号 / 区域词）—— 产品目录因此天然优先于 OTA 配置名；
+     *   2. 都干净或都脏时，取更短的（去掉冗余后缀）。
+     * 显示名统一去掉版本号（"Robin 1.3.0" → "Robin"、"U.C.T.S 1.3.0" → "U.C.T.S"）。
+     */
     private fun addEntry(out: MutableMap<String, Entry>, raw: String?) {
         val name = raw?.trim().orEmpty()
         if (name.length < 2) return
         val key = normalize(name)
         if (key.length < 2) return
-        // 同一个 key 只留一条；已有则跳过（产品目录优先）
-        out.putIfAbsent(key, Entry(name, key))
+        val existing = out[key]
+        if (existing == null || betterName(name, existing.name)) {
+            val display = name.replace(VERSION_RE, " ").replace(Regex("""\s+"""), " ").trim()
+            out[key] = Entry(display.ifEmpty { name }, key)
+        }
+    }
+
+    private fun isDirty(name: String): Boolean =
+        VERSION_RE.containsMatchIn(name) || DIRTY_RE.containsMatchIn(name)
+
+    private fun betterName(a: String, b: String): Boolean {
+        val da = isDirty(a)
+        val db = isDirty(b)
+        if (da != db) return !da
+        return a.length < b.length
     }
 
     private fun JsonObject.string(k: String): String? =
@@ -131,8 +153,10 @@ object MoondropCatalog {
      */
     private fun normalize(raw: String): String {
         var s = raw.uppercase()
-        // 版本号（1.2.3 / 1.2.3.4 / 1.2）整段去掉
-        s = s.replace(Regex("""\b\d+(?:\.\d+){1,3}\b"""), " ")
+        // 版本号（1.2.3 / 1.2.3.4 / 1.2）整段去掉。
+        // 注意前缀不能用 \b：UTCS1.4.0 里 S 与 1 都是词字符、没有边界，
+        // 用 \b 会把「1.4.0」漏掉，归一化成 UTCS1 —— 改成「前一字符不是字母」。
+        s = s.replace(Regex("""(?<![A-Za-z])\d+(?:\.\d+){1,3}(?!\d)"""), " ")
         // 单独的构建号（如 "160"）以及区域/状态词
         for (w in listOf(
             "JP", "EN", "CN", "KO", "KR", "JA", "ENGLISH", "JAPANESE", "KOREAN",
