@@ -10,6 +10,8 @@
  */
 package moe.huime.miuixmoondrop
 
+import moe.huime.miuixmoondrop.core.MoondropCatalog
+
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -28,6 +30,8 @@ import moe.huime.miuixmoondrop.ui.saveThemeMode
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 官方云端机型目录（与官方 APP 同源）：后台拉一次，失败无副作用
+        Thread { runCatching { MoondropCatalog.refresh() } }.start()
         super.onCreate(savedInstanceState)
 
         setContent {

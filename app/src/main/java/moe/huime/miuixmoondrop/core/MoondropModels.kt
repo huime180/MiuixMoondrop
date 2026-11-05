@@ -546,9 +546,33 @@ object MoondropModels {
         for ((alias, model) in BY_ALIAS) {
             if (n.contains(alias)) return model
         }
+        // 官方云端目录兜底（与官方 APP 同源）：官方命名/拼写变体（UTCS、SP2…）与新机型
+        // 都能认出来。目录没拉到或没命中时返回 null，行为与以前完全一致。
+        MoondropCatalog.resolve(deviceName)?.let { return catalogModel(it) }
         if (n.contains("MOONDROP") || n.contains("水月雨")) return FALLBACK
         return null
     }
+
+    /** 云端目录命中时构造的「官方认识、本地无档案」的型号：功能全靠能力探测。 */
+    private val CATALOG_CACHE = HashMap<String, MoondropModel>()
+
+    private fun catalogModel(entry: MoondropCatalog.Entry): MoondropModel =
+        CATALOG_CACHE.getOrPut(entry.key) {
+            MoondropModel(
+                id = "catalog_" + entry.key.lowercase().replace(' ', '_'),
+                nameZh = entry.name,
+                nameEn = entry.name,
+                aliases = listOf(entry.key),
+                chipset = "官方云端目录（能力探测）",
+                transports = FALLBACK.transports,
+                verified = false,
+                anc = null,
+                dc = NONE,
+                features = FeatureProfile(),
+                note = "官方云端机型目录命中（products/all / ota-configs/all）；" +
+                    "功能一律按连接后的能力探测决定，不做型号级猜测。",
+            )
+        }
 
     /** 是否为本应用接管的设备。 */
     fun isMoondrop(deviceName: String?): Boolean = match(deviceName) != null
