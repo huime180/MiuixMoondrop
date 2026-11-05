@@ -33,6 +33,9 @@ object MoondropCatalog {
     private const val OTA_CONFIGS_URL = "https://cdn-service.moondroplab.tech/api/v1/ota-configs/all"
     private const val TIMEOUT_MS = 15_000
 
+    /** 版本号（1.2.3 / 1.2.3.4 / 1.2）：前后都不限边界，字母紧邻也要剥掉（UTCS1.4.0）。 */
+    private val VERSION_RE = Regex("""\d+(?:\.\d+){1,3}(?!\d)""")
+
     /** 一条官方目录项：官方规范名 + 归一化匹配键（大写、去版本/区域后缀）。 */
     data class Entry(val name: String, val key: String)
 
@@ -105,7 +108,6 @@ object MoondropCatalog {
         return out.values.toList()
     }
 
-    private val VERSION_RE = Regex("""(?<![A-Za-z])\d+(?:\.\d+){1,3}(?!\d)""")
     private val DIRTY_RE = Regex("""\b(?:JP|EN|CN|KO|KR|JA|SPECIAL|INIT|TEST\d?)\b""", RegexOption.IGNORE_CASE)
 
     /**
@@ -154,9 +156,12 @@ object MoondropCatalog {
     private fun normalize(raw: String): String {
         var s = raw.uppercase()
         // 版本号（1.2.3 / 1.2.3.4 / 1.2）整段去掉。
-        // 注意前缀不能用 \b：UTCS1.4.0 里 S 与 1 都是词字符、没有边界，
-        // 用 \b 会把「1.4.0」漏掉，归一化成 UTCS1 —— 改成「前一字符不是字母」。
-        s = s.replace(Regex("""(?<![A-Za-z])\d+(?:\.\d+){1,3}(?!\d)"""), " ")
+        // 不能用 \b 前缀：UTCS1.4.0 里 S 与 1 都是词字符、没有边界，会漏掉「1.4.0」；
+        // 也不能用字母 lookbehind（同样挡掉紧邻字母的版本号）。只在后面限一个数字。
+        s = s.replace(VERSION_RE, " ")
+        // 品牌前缀不影响匹配（设备名里可能带、目录里可能不带）
+        for brand in listOf("MOONDROP", "PANDAER", "MOONDROP X"):
+            s = s.replace(brand, " ")
         // 单独的构建号（如 "160"）以及区域/状态词
         for (w in listOf(
             "JP", "EN", "CN", "KO", "KR", "JA", "ENGLISH", "JAPANESE", "KOREAN",
