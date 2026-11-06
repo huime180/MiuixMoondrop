@@ -22,9 +22,10 @@
  *      由连接后的能力探测（GET_SUPPORTED_FEATURES 位图 + 实际回包）裁决。
  *   2. 未命中档案的水月雨设备回退 [fallback]，以「可探测 + 保守」策略工作，不会因为
  *      型号不认识就完全不可用。
- *   3. **新增机型不再需要加表**：识别交给官方云端目录（MoondropCatalog，与官方 APP 同源），
- *      功能交给能力探测。只有在真机实测出「设备码语义与默认不同」时，才在 MODELS 里补一条
- *      **校准数据**（如 GA2 的 [1,2,4,3]），并且必须标注 verified = true、写清实测来源。
+ *   3. **不维护任何机型清单**（2026-11 决定）：识别完全交给官方云端目录
+ *      （MoondropCatalog，与官方 APP 同源），功能完全交给连接后的能力探测，未命中时
+ *      用 FALLBACK 的多链路 + 保守默认。实测校准数据暂时不启用 —— 将来若某型号的
+ *      设备码语义确实需要覆盖，再按 verified = true + 实测来源的形式单独加回。
  */
 package moe.huime.miuixmoondrop.core
 
@@ -251,114 +252,11 @@ object MoondropModels {
     val MODELS: List<MoondropModel> = listOf(
 
         // ── 已实测 ────────────────────────────────────────────────────────
-        MoondropModel(
-            id = "edge",
-            nameZh = "羽翼 EDGE",
-            nameEn = "EDGE",
-            aliases = listOf("MOONDROP EDGE", "EDGE"),
-            chipset = "Qualcomm QCC（GAIA v3 / vendor 0x001D）",
-            transports = listOf(PodTransport.BLE_GAIA),
-            verified = true,
-            anc = anc3Ac(),
-            dc = GAIN_IDENTITY,
-            features = FeatureProfile(
-                promptTone = true, promptVolume = true,
-                lhdc = true, dualConnection = true, lowLatency = true,
-            ),
-            singleDeviceBattery = true,
-            note = "moondrop-link-desktop 真机验证：电量只回 type 0（单设备）；" +
-                "ANC 走 AUDIO_CURATION 三态位掩码 1/2/4；ONEBRINGTWO(0x14) 可用。",
-        ),
 
-        MoondropModel(
-            id = "pudding",
-            nameZh = "布丁",
-            nameEn = "PUDDING",
-            aliases = listOf("PUDDING", "MD-TWS-056", "布丁"),
-            chipset = "国产 SoC（GAIA v4 over RFCOMM/SPP）",
-            transports = listOf(PodTransport.RFCOMM_GAIA),
-            verified = true,
-            anc = ancPudding(),
-            // ⚠ 真机实测修正（用户反馈「增益低和高反了」）：设备码 0=高 / 1=中 / 2=低，
-            //   因此 UI 下标[低,中,高] -> 设备码必须是 [2,1,0]。
-            //   （FxxkMoondrop 的 PUDDING 档案写的 [0,1,2] 是错的，太空漫游2 实测也是反向。）
-            dc = DcProfile(
-                hasGain = true, gainMap = intArrayOf(2, 1, 0),
-                gainLabels = listOf("低", "中", "高"), hasLed = true,
-            ),
-            features = FeatureProfile(
-                lhdc = true, promptTone = true, promptVolume = true,
-                dualConnection = true, lowLatency = true,
-            ),
-            note = "✅ 2026-09-14 真机抓包确认（84:D9:27:18:6F:2A, FW 3.5.6）：" +
-                "走 RFCOMM/SPP over BR/EDR（**不是** BLE GATT），GAIA 帧前有 4 字节 SPP 头 " +
-                "`FF 04 00 <n>`；受支持能力 = {0,1,5,13,14,15,16,19,20,22,32}；" +
-                "电量类型仅 {1=左,2=右}（无 type 0，充电盒报 0xFF=离线）；" +
-                "ANC_V2 cmd3 回 00；增益 feature15 回 00；指示灯 feature19 回 01；" +
-                "feature20 双设备连接可用（cmd1 回 00）；feature14 提示音可用；" +
-                "feature16 LHDC 可用（`00 1D 20 06 00` 实测关闭后编码由 LHDCv5 变 AAC）。" +
-                "兼容 HyperOS Device ID 01010607。",
-        ),
 
-        MoondropModel(
-            id = "golden_ages_2",
-            nameZh = "梦回2",
-            nameEn = "GOLDEN AGES 2",
-            aliases = listOf("GOLDEN AGES 2", "GOLDENAGES2", "GOLDEN AGES2", "梦回2", "GA2"),
-            chipset = "TWS-01 定制 SoC（GAIA）",
-            transports = listOf(PodTransport.BLE_GAIA),
-            verified = true,
-            anc = anc4Ga2(),
-            dc = DcProfile(hasGain = true, gainMap = intArrayOf(2, 1, 0), hasSpatial = true, hasHeadTracking = true),
-            features = FeatureProfile(lhdc = true),
-            note = "FxxkMoondrop 真机双向实测：SET 映射 [1,2,4,3]、GET 为 0-based [0,1,2,3]" +
-                "（SET 与 GET 枚举不同，这是 GA2 固件特性）。无充电盒电量、无指示灯。",
-        ),
 
-        MoondropModel(
-            id = "space_travel_2",
-            nameZh = "太空漫游2",
-            nameEn = "SPACE TRAVEL 2",
-            aliases = listOf("SPACE TRAVEL 2", "SPACETRAVEL2", "太空漫游2", "ST2"),
-            chipset = "中科蓝讯 BT8932F（9ECA + GAIA）",
-            transports = listOf(PodTransport.BLE_GAIA, PodTransport.BLE_SRC_9ECA, PodTransport.RFCOMM_GAIA),
-            verified = true,
-            anc = anc4Ga2(),
-            dc = GAIN_REVERSED,
-            features = FeatureProfile(lhdc = false),
-            note = "FxxkMoondrop 真机实测：ANC 走 AudioCuration，映射同 GA2；" +
-                "增益设备码 0=高/1=中/2=低（与恒等相反，故 gainMap=[2,1,0]）。",
-        ),
 
         // ── 芯片级推断（待实测） ───────────────────────────────────────────
-        MoondropModel(
-            id = "robin",
-            nameZh = "知更鸟",
-            nameEn = "ROBIN",
-            aliases = listOf("ROBIN", "知更鸟"),
-            chipset = "中科蓝讯 BT8952F（9ECA）",
-            transports = listOf(PodTransport.BLE_GAIA, PodTransport.BLE_SRC_9ECA),
-            verified = true,
-            // ⚠ FxxkMoondrop issue #12 真机实测：只有降噪/透传两档（之前 4 档会多出死按钮）。
-            anc = ancRobin(),
-            dc = GAIN_IDENTITY,
-            features = FeatureProfile(),
-        ),
-        MoondropModel(
-            id = "ucts",
-            nameZh = "U.C.T.S（开放式）",
-            nameEn = "U.C.T.S",
-            aliases = listOf("U.C.T.S", "U.C.T.S.", "UCTS", "MD-OWS-014"),
-            chipset = "高通 QCC（GAIA）",
-            transports = listOf(PodTransport.BLE_GAIA),
-            verified = true,
-            // 硬件本身不含降噪：不给档案（交给能力探测），避免出现点了没反应的降噪按钮。
-            anc = null,
-            dc = NONE,
-            features = FeatureProfile(),
-            note = "✅ 实机验证（FxxkMoondrop issue #9）：识别 / 控制 / 左右耳电量 / 弹窗均正常；" +
-                "**硬件本身没有降噪**，降噪类功能不可用属预期而非缺陷。",
-        ),
     )
 
     /**
