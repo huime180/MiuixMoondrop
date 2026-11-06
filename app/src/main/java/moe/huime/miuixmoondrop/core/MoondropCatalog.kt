@@ -44,8 +44,8 @@ object MoondropCatalog {
     private val PUNCT_RE = Regex("""[^A-Z0-9\u4e00-\u9fff]+""")
     private val SPACES_RE = Regex("""\s+""")
 
-    /** 一条官方目录项：官方规范名 + 归一化匹配键（大写、去版本/区域后缀）。 */
-    data class Entry(val name: String, val key: String)
+    /** 一条官方目录项：官方规范名 + 归一化匹配键（大写、去版本/区域后缀）+ 官方芯片族。 */
+    data class Entry(val name: String, val key: String, val chipRoot: String? = null)
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -101,7 +101,12 @@ object MoondropCatalog {
             val o = el as? JsonObject ?: continue
             val type = o["type"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
             if (!type.equals("BT", ignoreCase = true)) continue
-            addEntry(out, o.string("name") ?: o.string("productName"))
+            // 官方用 appResourceRoot.uri 标注芯片族（/jieli /bluetrum /qualcomm …），
+            // 它决定了传输方式，见 MoondropModels.transportsForChip()
+            val chipRoot = o["appResourceRoot"]?.let { root ->
+                runCatching { root.jsonObject["uri"]?.jsonPrimitive?.content }.getOrNull()
+            }
+            addEntry(out, o.string("name") ?: o.string("productName"), chipRoot)
         }
 
         // 2) OTA 配置目录：名称里带版本/区域后缀，归一化后即官方机型名（含拼写变体）
@@ -124,7 +129,7 @@ object MoondropCatalog {
      *   2. 都干净或都脏时，取更短的（去掉冗余后缀）。
      * 显示名统一去掉版本号（"Robin 1.3.0" → "Robin"、"U.C.T.S 1.3.0" → "U.C.T.S"）。
      */
-    private fun addEntry(out: MutableMap<String, Entry>, raw: String?) {
+    private fun addEntry(out: MutableMap<String, Entry>, raw: String?, chipRoot: String? = null) {
         val name = raw?.trim().orEmpty()
         if (name.length < 2) return
         val key = normalize(name)
@@ -132,7 +137,7 @@ object MoondropCatalog {
         val existing = out[key]
         if (existing == null || betterName(name, existing.name)) {
             val display = name.replace(VERSION_RE, " ").replace(Regex("""\s+"""), " ").trim()
-            out[key] = Entry(display.ifEmpty { name }, key)
+            out[key] = Entry(display.ifEmpty { name }, key, chipRoot ?: existing?.chipRoot)
         }
     }
 

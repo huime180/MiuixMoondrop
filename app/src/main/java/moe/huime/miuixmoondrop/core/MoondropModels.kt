@@ -306,6 +306,27 @@ object MoondropModels {
         return null
     }
 
+    /**
+     * 官方云端芯片族 → 传输链路。（appResourceRoot 就是官方标注的芯片族）
+     *
+     *  - `/jieli`（杰理，如布丁）：GAIA V4 over **RFCOMM/SPP**，BLE 上直接回 status=147；
+     *  - `/qualcomm`（QCC）：GAIA V3 over BLE GATT；
+     *  - `/bluetrum`（中科蓝讯）等：BLE GAIA + 私有 9ECA；
+     *  - 未知：沿用 FALLBACK 的多链路顺序。
+     */
+    private fun transportsForChip(chipRoot: String?): List<PodTransport> = when {
+        chipRoot == null -> FALLBACK.transports
+        chipRoot.startsWith("/jieli") ->
+            listOf(PodTransport.RFCOMM_GAIA, PodTransport.BLE_GAIA)
+        chipRoot.startsWith("/qualcomm") ->
+            listOf(PodTransport.BLE_GAIA, PodTransport.RFCOMM_GAIA)
+        chipRoot.startsWith("/bluetrum") || chipRoot.startsWith("/spv") ||
+            chipRoot.startsWith("/comture") || chipRoot.startsWith("/synopsys") ||
+            chipRoot.startsWith("/airoha") || chipRoot.startsWith("/jiu") ->
+            listOf(PodTransport.BLE_GAIA, PodTransport.BLE_SRC_9ECA, PodTransport.RFCOMM_GAIA)
+        else -> FALLBACK.transports
+    }
+
     /** 云端目录命中时构造的「官方认识、本地无档案」的型号：功能全靠能力探测。 */
     private val CATALOG_CACHE = HashMap<String, MoondropModel>()
 
@@ -317,7 +338,7 @@ object MoondropModels {
                 nameEn = entry.name,
                 aliases = listOf(entry.key),
                 chipset = "官方云端目录（能力探测）",
-                transports = FALLBACK.transports,
+                transports = transportsForChip(entry.chipRoot),
                 verified = false,
                 anc = null,
                 dc = NONE,
