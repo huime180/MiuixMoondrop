@@ -36,6 +36,14 @@ object MoondropCatalog {
     /** 版本号（1.2.3 / 1.2.3.4 / 1.2）：前后都不限边界，字母紧邻也要剥掉（UTCS1.4.0）。 */
     private val VERSION_RE = Regex("""\d+(?:\.\d+){1,3}(?!\d)""")
 
+    /** 区域 / 状态词（落在地名或版本后缀里，剥掉后才是官方规范名）。 */
+    private val REGION_RE = Regex(
+        """\b(?:JP|EN|CN|KO|KR|JA|ENGLISH|JAPANESE|KOREAN|SPECIAL|INIT|TEST2|TEST|TO USER|ORIGINAL VERSION|ORIGINAL)\b"""
+    )
+
+    private val PUNCT_RE = Regex("""[^A-Z0-9\u4e00-\u9fff]+""")
+    private val SPACES_RE = Regex("""\s+""")
+
     /** 一条官方目录项：官方规范名 + 归一化匹配键（大写、去版本/区域后缀）。 */
     data class Entry(val name: String, val key: String)
 
@@ -108,7 +116,7 @@ object MoondropCatalog {
         return out.values.toList()
     }
 
-    private val DIRTY_RE = Regex("""\b(?:JP|EN|CN|KO|KR|JA|SPECIAL|INIT|TEST\d?)\b""", RegexOption.IGNORE_CASE)
+    private val DIRTY_RE = REGION_RE
 
     /**
      * 同一匹配键只留一条，择优规则：
@@ -155,23 +163,16 @@ object MoondropCatalog {
      */
     private fun normalize(raw: String): String {
         var s = raw.uppercase()
-        // 版本号（1.2.3 / 1.2.3.4 / 1.2）整段去掉。
-        // 不能用 \b 前缀：UTCS1.4.0 里 S 与 1 都是词字符、没有边界，会漏掉「1.4.0」；
-        // 也不能用字母 lookbehind（同样挡掉紧邻字母的版本号）。只在后面限一个数字。
+        // 版本号（1.2.3 / 1.2.3.4 / 1.2）整段去掉：不能用 \b 前缀（UTCS1.4.0 里 S 与 1
+        // 都是词字符、没有边界），也不能用字母 lookbehind（同样挡掉紧邻字母的版本号）。
         s = s.replace(VERSION_RE, " ")
         // 品牌前缀不影响匹配（设备名里可能带、目录里可能不带）
-        for brand in listOf("MOONDROP", "PANDAER", "MOONDROP X"):
-            s = s.replace(brand, " ")
-        // 单独的构建号（如 "160"）以及区域/状态词
-        for (w in listOf(
-            "JP", "EN", "CN", "KO", "KR", "JA", "ENGLISH", "JAPANESE", "KOREAN",
-            "SPECIAL", "INIT", "TEST", "TEST2", "TO USER", "ORIGINAL VERSION", "ORIGINAL",
-        )) {
-            s = s.replace(Regex("""\b$w\b"""), " ")
-        }
+        s = s.replace("MOONDROP X", " ").replace("MOONDROP", " ").replace("PANDAER", " ")
+        // 区域 / 状态词（用一条交替正则，避免 Kotlin 2.x 对 for + listOf 的歧义解析）
+        s = s.replace(REGION_RE, " ")
         // 标点 → 空格
-        s = s.replace(Regex("""[^A-Z0-9\u4e00-\u9fff]+"""), " ")
-        return s.replace(Regex("""\s+"""), " ").trim()
+        s = s.replace(PUNCT_RE, " ")
+        return s.replace(SPACES_RE, " ").trim()
     }
 
     private fun httpGet(url: String): ByteArray? {
