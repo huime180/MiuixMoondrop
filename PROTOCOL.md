@@ -745,3 +745,28 @@ dev 分支同库同版本）—— 手拼 `miui.focus.pics` / `miui.focus.action
    真机联调结论（记在 `core/MoondropModels.kt` 的 `note` 与 `pods/MoondropLink.kt`、
    `pods/ControlBridge.kt` 的注释里），其余机型没有本应用自己的真机结论。CI 已通过编译与单测并产出
    APK（见 [README.md](README.md) 构建状态），但不为未验证的机型背书。
+
+---
+
+## 附录 B：官方 App 的协议级枚举（dex 逆向，2026-11）
+
+从官方 APK（Flutter + Java `com.qualcomm.qti.gaiaclient`）的 dex 字符串池提取。
+官方**不查机型表**：档位语义来自这些**协议级枚举**，可用性来自设备自报（feature 位图 / 回报）。
+
+| 域 | 官方常量（dex） | 说明 | 我们 |
+|---|---|---|---|
+| ANC 档位 | `ANC_MODE_AD00..AD05`、`ADAPTIVE_ANC`、`ADAPTIVE_LEAKTHROUGH_ANC` | 6 档枚举：OFF/ON/TRANSPARENT/ANTI_WIND/ADAPTIVE/LIVE | ✅ 已按路径映射（ANC_V2 恒等 + 型号校准） |
+| ANC 动作 | `getANCMode` / `getANCActions` / `setANCAction1..4`、`AvailableModeList` | 设备回报当前档与可用动作 | ⚠️ 我们只探测路径，未读“可用动作列表” |
+| 音频管理 | `AUDIO_CURATION`、`CURRENT_ANC_SWITCH_CONF` | AC 路径：位掩码 1/2/4 + 切换顺序 | ✅ 位掩码已实现 |
+| 增益 | `GAIN`、`ANC_GAIN_INDEX`(GET/SET)、`AMBIENT_FUSION_GAIN_INDEX`(GET/SET)、`ADAPTED_GAIN`、`AF/ANC_TUNING_MAX_GAIN`、`FEEDBACK_GAIN`、`FEED_FORWARD_GAIN` | ANC 调音增益 + 环境融合增益索引（**独立于** DAC 增益 feature 15） | ⚠️ 只有 DAC 增益；ANC/融合增益索引未实现 |
+| 触控 | `TOUCHPAD_CONFIGURATION`、`SINGLE_TOUCHPAD`、`TouchpadConfiguration{value=` | 触控板 v3 配置 | ✅ 手势走 TOUCHV2；v3 未接 |
+| 语音 | `VOICE_TRIGGER_ENABLED/COUNT`(GET/SET)、`VOICE_INCOMING`、`VOICE_ACCEPT_CALL`、`VOICE_HANG_UP_CALL`、`VOICE_INDEX`、`BYPASS_VOICE`、`SMART_VOICE_PICKUP` | 提示音 + 语音助手/来电处理 | ⚠️ 提示音已实现；语音触发/来电动作未接 |
+| 电量 | `BATTERY`、`BATTERY_LOW_ON_DEVICE`、`BatteryLevel(battery=` | 电量 + 低电提示 | ✅ 已实现 |
+| EQ | `CMD_GET_EQ`、`CMD_SET_EQ`、`CMD_GET_EQ_PARAM(S)`、`CMD_GET_EQ_PARAM_LIST`、`CMD_GET_EQ_COEFFS_LIST`、`CMD_GET_EQ_PARAMS_FROM_FLASH`、`CMD_GET_FREQUENCY`、`switchEQMode`、`mIsEQInFWEnabled` | 完整 EQ 命令集（参数/系数/频点/预设切换） | ❌ 未实现（**下一个可做的功能**） |
+| 空间音频 | `SPATIAL_AUDIO`、`SpatialFrequencyResponse` | 空间音频 + 频响 | ✅ 已有 |
+| 升级 | `startUpgrade` / `confirmUpgrade` / `UpgradeState` / `UpgradeType` | OTA 固件升级 | ❌ 未实现（不建议做） |
+| 设备信息 | `DEVICE_INFORMATION`、`GetDeviceInformation` | 型号/固件/序列号 | ✅ 部分（固件版本已读） |
+| 游戏/低延迟 | 只有 `USAGE_GAME`（Android 音频属性） | **官方没有游戏模式协议命令** | — 与之前的抓包结论一致 |
+
+> 结论：官方“正确的文字说明”= 上表这些**协议级枚举**（写死在代码里）+ 设备自报能力。
+> 因此我们照抄枚举即可，**不需要机型表**；像布丁这种固件偏离标准枚举的，才用实测校准覆盖。
