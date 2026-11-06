@@ -327,6 +327,27 @@ object MoondropModels {
         else -> FALLBACK.transports
     }
 
+    /**
+     * 云端给不了的「设备码语义」→ 实测校准。
+     *
+     * 云端能提供：名称、产品图、芯片族（决定传输链路）。
+     * 云端**不提供**：ANC 档位设备码、增益方向 —— ota-config 下发的是加密固件（.ufw），
+     * products 只有元数据。这两项只能真机实测，所以按官方匹配键挂校准，命中才套用；
+     * 未命中的型号不猜，直接交给能力探测的默认值。
+     *
+     * 目前只挂布丁（用户实测反馈：空清单后 ANC 不可用、增益反向）：
+     *  · ANC_V2 档位：UI[关,降,透,抗,自适应] → dev [0,4,2,3,1]（PuddingPods 文档 + 真机确认）
+     *  · 增益：设备码 0=高 / 1=中 / 2=低 → UI[低,中,高] 需映射 [2,1,0]
+     */
+    private fun calibrationFor(key: String): Pair<AncProfile?, DcProfile> = when {
+        key.contains("PUDDING") -> ancPudding() to DcProfile(
+            hasGain = true,
+            gainMap = intArrayOf(2, 1, 0),
+            hasLed = true,
+        )
+        else -> null to NONE
+    }
+
     /** 云端目录命中时构造的「官方认识、本地无档案」的型号：功能全靠能力探测。 */
     private val CATALOG_CACHE = HashMap<String, MoondropModel>()
 
@@ -340,8 +361,9 @@ object MoondropModels {
                 chipset = "官方云端目录（能力探测）",
                 transports = transportsForChip(entry.chipRoot),
                 verified = false,
-                anc = null,
-                dc = NONE,
+                // 云端识别出的型号：套用实测校准（没有校准的走能力探测默认值）
+                anc = calibrationFor(entry.key).first,
+                dc = calibrationFor(entry.key).second,
                 features = FeatureProfile(),
                 note = "官方云端机型目录命中（products/all / ota-configs/all）；" +
                     "功能一律按连接后的能力探测决定，不做型号级猜测。",
