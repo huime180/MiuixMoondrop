@@ -75,6 +75,18 @@ object MoondropCatalog {
     }
 
     /**
+     * 确保目录已加载；未加载时**同步**拉一次（配合「先云端配置、再决定线路」）。
+     *
+     * 位置要求：连接流程必须在**选传输**之前调用。云端 products/all 里的芯片族
+     * （appResourceRoot）决定了走 BLE 还是 RFCOMM/SPP；目录没到就选线路等于瞎猜
+     * （布丁会先撞 BLE status=147 再回落）。只在第一次连接时真的发网络请求，之后走缓存。
+     */
+    fun ensureLoaded() {
+        if (loaded) return
+        refresh(force = true)
+    }
+
+    /**
      * 把设备名解析成官方规范名；未命中返回 null。
      *
      * 匹配规则：两边都归一化后做 contains（取最长的命中键，避免 "EDGE" 抢 "EDGE2"）。
