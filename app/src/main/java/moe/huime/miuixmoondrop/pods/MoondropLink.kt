@@ -868,18 +868,32 @@ object MoondropLink {
     // ══════════════════════════════════════════════════════════════════════
 
     fun setAnc(uiIndex: Int) {
-        val prof = model.anc ?: return
-        val dev = prof.uiToDevice(uiIndex)
-        if (dev < 0) return
         scope.launch {
             when (capabilities.ancPath) {
-                Gaia.ANC_PATH_ANC_V2 -> write(Gaia.ancV2SetMode(dev))
+                Gaia.ANC_PATH_ANC_V2 -> {
+                    // 官方 AncV2Handler 枚举：OFF=0/ON=1/TRANSPARENT=2/ANTI_WIND=3/
+                    // ADAPTIVE=4/LIVE=5，与 UI 顺序一致 → **未校准时恒等**；只有型号档案
+                    // 明确写了 ANC_V2 专属映射（布丁 [0,4,2,3,1]）才覆盖。
+                    // 之前一律用 model.anc（AC 的 [1,2,3,4]）→ 布丁点「降噪」发 2（透传），
+                    // 表现就是“降噪没法用”。
+                    val prof = model.anc
+                    val dev = if (prof != null && prof.path == AncPathKind.ANC_V2) {
+                        prof.uiToDevice(uiIndex)
+                    } else {
+                        uiIndex
+                    }
+                    if (dev < 0) return@launch
+                    write(Gaia.ancV2SetMode(dev))
+                }
                 Gaia.ANC_PATH_AUDIO_CURATION -> {
-                    // EDGE 真机确认：AC 的 SET_MODE payload 是位掩码 1/2/4
+                    val dev = model.anc?.uiToDevice(uiIndex) ?: uiIndex
                     val bit = Gaia.AC_SET_PAYLOAD.getOrNull(uiIndex) ?: dev
                     write(Gaia.audioCurationSetMode(bit))
                 }
-                Gaia.ANC_PATH_ANC_V1 -> write(Gaia.ancV1SetState(if (dev == 0) 0 else 1))
+                Gaia.ANC_PATH_ANC_V1 -> {
+                    val ui = model.anc?.uiToDevice(uiIndex) ?: uiIndex
+                    write(Gaia.ancV1SetState(if (ui == 0) 0 else 1))
+                }
             }
             delay(300)
             refreshAnc()
