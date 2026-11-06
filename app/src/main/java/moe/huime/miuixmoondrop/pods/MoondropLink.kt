@@ -293,7 +293,9 @@ object MoondropLink {
                 g.discoverServices()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.d(TAG, "GATT disconnected status=$status")
+                val gone = device ?: g.device
                 if (connected) disconnectInternal(notify = true)
+                maybeFallbackToRfcomm(status, gone)
             }
         }
 
@@ -362,6 +364,22 @@ object MoondropLink {
     }
 
     // ── RFCOMM / SPP ───────────────────────────────────────────────────────
+
+    /** 每个会话只尝试一次 RFCOMM 回落（避免失败机型来回重连）。 */
+    private var rfcommFallbackTried = false
+
+    /**
+     * GATT **连接失败**时也回落到 RFCOMM/SPP（未收录型号走 FALLBACK，BLE 优先，
+     * 而像布丁这种设备在 BLE 上直接回 status=147；原实现只在服务发现阶段回落）。
+     */
+    private fun maybeFallbackToRfcomm(status: Int, target: BluetoothDevice?) {
+        if (rfcommFallbackTried || useRfcomm || target == null) return
+        if (model.transports.none { it == PodTransport.RFCOMM_GAIA }) return
+        rfcommFallbackTried = true
+        useRfcomm = true
+        Log.i(TAG, "GATT 失败(status=$status)，回落到 RFCOMM/SPP: ${target.address}")
+        scope.launch { connectRfcomm(target) }
+    }
 
     private fun connectRfcomm(btDevice: BluetoothDevice, retry: Int = 0) {
         try {
