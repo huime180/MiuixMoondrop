@@ -41,6 +41,12 @@ object MoondropCatalog {
         """\b(?:JP|EN|CN|KO|KR|JA|ENGLISH|JAPANESE|KOREAN|SPECIAL|INIT|TEST2|TEST|TO USER|ORIGINAL VERSION|ORIGINAL)\b"""
     )
 
+    /** 大小写不敏感版（显示名/脏词判断用；normalize 会先 uppercase，不需要）。 */
+    private val REGION_RE_CI = Regex(
+        """\b(?:JP|EN|CN|KO|KR|JA|ENGLISH|JAPANESE|KOREAN|SPECIAL|INIT|TEST2|TEST|TO USER|ORIGINAL VERSION|ORIGINAL)\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
     private val PUNCT_RE = Regex("""[^A-Z0-9\u4e00-\u9fff]+""")
     private val SPACES_RE = Regex("""\s+""")
 
@@ -148,13 +154,19 @@ object MoondropCatalog {
         if (key.length < 2) return
         val existing = out[key]
         if (existing == null || betterName(name, existing.name)) {
-            val display = name.replace(VERSION_RE, " ").replace(Regex("""\s+"""), " ").trim()
+            // 显示名同样去掉版本号和区域/状态词（"Pudding to user" → "Pudding"）
+            val display = name.replace(VERSION_RE, " ")
+                .replace(REGION_RE_CI, " ")
+                .replace(Regex("""\s+"""), " ").trim()
             out[key] = Entry(display.ifEmpty { name }, key, chipRoot ?: existing?.chipRoot)
         }
     }
 
-    private fun isDirty(name: String): Boolean =
-        VERSION_RE.containsMatchIn(name) || DIRTY_RE.containsMatchIn(name)
+    /** 脏名判断：大小写不敏感（官方目录里有 "Pudding to user" 这种小写后缀）。 */
+    private fun isDirty(name: String): Boolean {
+        val u = name.uppercase()
+        return VERSION_RE.containsMatchIn(u) || DIRTY_RE.containsMatchIn(u)
+    }
 
     private fun betterName(a: String, b: String): Boolean {
         val da = isDirty(a)
